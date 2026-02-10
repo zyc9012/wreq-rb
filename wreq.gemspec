@@ -1,0 +1,31 @@
+# frozen_string_literal: true
+
+Gem::Specification.new do |spec|
+  spec.name          = "wreq"
+  spec.version       = "0.1.0"
+  spec.authors       = ["Yicheng Zhou"]
+  spec.summary       = "Ruby HTTP client featuring TLS fingerprint emulation, HTTP/2 support, cookie handling, and proxy support."
+  spec.description   = "An ergonomic Ruby HTTP client powered by Rust's wreq library, " \
+                        "featuring TLS fingerprint emulation (JA3/JA4), HTTP/2 support, " \
+                        "cookie handling, proxy support, and redirect policies."
+  spec.homepage      = "https://github.com/zyc9012/wreq-rb"
+  spec.license       = "MIT"
+  spec.required_ruby_version = ">= 2.7.0"
+
+  spec.files = Dir[
+    "lib/**/*.rb",
+    "ext/**/*.{rs,toml,lock,rb}",
+    "vendor/wreq/**/*.{rs,toml}",
+    "vendor/wreq/LICENSE",
+    "vendor/wreq/README.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "LICENSE",
+    "README.md",
+  ]
+
+  spec.require_paths = ["lib"]
+  spec.extensions    = ["ext/wreq_rb/extconf.rb"]
+
+  spec.add_dependency "rb_sys", "~> 0.9"
+end

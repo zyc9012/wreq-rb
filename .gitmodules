@@ -1,0 +1,3 @@
+[submodule "vendor/wreq"]
+	path = vendor/wreq
+	url = https://github.com/0x676e67/wreq.git

@@ -1,0 +1,3 @@
+[workspace]
+members = ["ext/wreq_rb"]
+resolver = "2"

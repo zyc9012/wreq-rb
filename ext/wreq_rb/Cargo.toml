@@ -1,0 +1,29 @@
+[package]
+name = "wreq_rb"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+magnus = { version = "0.8", features = ["rb-sys"] }
+wreq = { path = "../../vendor/wreq", features = [
+  "cookies",
+  "json",
+  "gzip",
+  "brotli",
+  "zstd",
+  "deflate",
+  "socks",
+  "multipart",
+  "charset",
+  "stream",
+  "query",
+  "form",
+] }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1.0"
+bytes = "1"
+http = "1"

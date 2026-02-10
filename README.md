@@ -1,0 +1,135 @@
+# wreq-rb
+
+Ruby bindings for the [wreq](https://github.com/0x676e67/wreq) Rust HTTP client — featuring TLS fingerprint emulation, HTTP/2 support, cookie handling, and proxy support.
+
+## Installation
+
+Add to your Gemfile:
+
+```ruby
+gem "wreq"
+```
+
+Then run:
+
+```bash
+bundle install
+```
+
+> **Build prerequisites:** You need Rust (1.85+), Clang, CMake, and Perl installed, since wreq compiles BoringSSL from source. See [wreq's build guide](https://github.com/0x676e67/wreq#building) for details.
+
+## Quick Start
+
+```ruby
+require "wreq"
+
+# Simple GET request
+resp = Wreq.get("https://httpbin.org/get")
+puts resp.status   # => 200
+puts resp.text     # => response body as string
+puts resp.json     # => parsed Ruby Hash
+
+# POST with JSON body
+resp = Wreq.post("https://httpbin.org/post", json: { name: "wreq", version: 1 })
+
+# POST with form data
+resp = Wreq.post("https://httpbin.org/post", form: { key: "value" })
+
+# Custom headers
+resp = Wreq.get("https://httpbin.org/headers",
+  headers: { "X-Custom" => "value", "Accept" => "application/json" })
+
+# Query parameters
+resp = Wreq.get("https://httpbin.org/get", query: { foo: "bar", page: "1" })
+
+# Authentication
+resp = Wreq.get("https://httpbin.org/bearer", bearer: "my-token")
+resp = Wreq.get("https://httpbin.org/basic-auth/user/pass", basic: ["user", "pass"])
+```
+
+## Using a Client
+
+For best performance, create a `Wreq::Client` and reuse it across requests (connections are pooled internally):
+
+```ruby
+client = Wreq::Client.new(
+  user_agent: "MyApp/1.0",
+  timeout: 30,                 # total timeout in seconds
+  connect_timeout: 5,          # connection timeout
+  read_timeout: 15,            # read timeout
+  redirect: 10,                # follow up to 10 redirects (false to disable)
+  cookies: true,               # enable cookie jar
+  proxy: "http://proxy:8080",  # proxy URL (supports http, https, socks5)
+  proxy_user: "user",          # proxy auth
+  proxy_pass: "pass",
+  https_only: false,           # restrict to HTTPS
+  http2_only: false,           # force HTTP/2
+  gzip: true,                  # enable gzip decompression
+  brotli: true,                # enable brotli decompression
+  zstd: true,                  # enable zstd decompression
+  headers: {                   # default headers for all requests
+    "Accept" => "application/json"
+  }
+)
+
+resp = client.get("https://api.example.com/data")
+resp = client.post("https://api.example.com/data", json: { key: "value" })
+```
+
+## HTTP Methods
+
+All methods are available on both `Wreq` (module-level) and `Wreq::Client` (instance-level):
+
+| Method | Usage |
+|--------|-------|
+| `get(url, **opts)` | GET request |
+| `post(url, **opts)` | POST request |
+| `put(url, **opts)` | PUT request |
+| `patch(url, **opts)` | PATCH request |
+| `delete(url, **opts)` | DELETE request |
+| `head(url, **opts)` | HEAD request |
+| `options(url, **opts)` | OPTIONS request |
+
+### Per-Request Options
+
+Pass an options hash as the second argument to any HTTP method:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `headers` | Hash | Request headers |
+| `body` | String | Raw request body |
+| `json` | Hash/Array | JSON-serialized body (sets Content-Type) |
+| `form` | Hash | URL-encoded form body |
+| `query` | Hash | URL query parameters |
+| `timeout` | Float | Per-request timeout (seconds) |
+| `auth` | String | Raw Authorization header |
+| `bearer` | String | Bearer token |
+| `basic` | Array | `[username, password]` for Basic auth |
+| `proxy` | String | Per-request proxy URL |
+
+## Response
+
+The `Wreq::Response` object provides:
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `status` / `code` | Integer | HTTP status code |
+| `text` / `body` | String | Response body as string |
+| `body_bytes` | Array | Raw bytes |
+| `headers` | Hash | Response headers |
+| `json` | Hash/Array | JSON-parsed body |
+| `url` | String | Final URL (after redirects) |
+| `version` | String | HTTP version |
+| `content_length` | Integer/nil | Content length if known |
+| `success?` | Boolean | Status 2xx? |
+| `redirect?` | Boolean | Status 3xx? |
+| `client_error?` | Boolean | Status 4xx? |
+| `server_error?` | Boolean | Status 5xx? |
+
+## Building from Source
+
+```bash
+bundle install
+bundle exec rake compile
+bundle exec rake test
+```
