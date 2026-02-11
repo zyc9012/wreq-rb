@@ -1,3 +1,6 @@
 [workspace]
 members = ["ext/wreq_rb"]
 resolver = "2"
+
+[patch.crates-io]
+wreq = { path = "vendor/wreq" }

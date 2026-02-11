@@ -23,6 +23,7 @@ wreq = { path = "../../vendor/wreq", features = [
   "query",
   "form",
 ] }
+wreq-util = { version = "=3.0.0-rc.9", features = ["emulation", "emulation-serde"] }
 tokio = { version = "1", features = ["full"] }
 serde_json = "1.0"
 bytes = "1"
@@ -32,3 +33,5 @@ http = "1"
 wreq = { path = "../../vendor/wreq", features = [
   "prefix-symbols",
 ] }
+
+

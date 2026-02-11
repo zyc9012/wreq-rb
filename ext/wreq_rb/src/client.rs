@@ -6,6 +6,7 @@ use magnus::{
 };
 use tokio::runtime::Runtime;
 use wreq::header::{HeaderMap, HeaderName, HeaderValue};
+use wreq_util::Emulation as BrowserEmulation;
 
 use crate::error::{generic_error, to_magnus_error};
 use crate::response::Response;
@@ -55,6 +56,20 @@ fn collect_response(resp: wreq::Response) -> Result<Response, magnus::Error> {
 }
 
 // --------------------------------------------------------------------------
+// Emulation helpers
+// --------------------------------------------------------------------------
+
+/// The default emulation to apply when none is specified.
+const DEFAULT_EMULATION: BrowserEmulation = BrowserEmulation::Chrome143;
+
+/// Parse a Ruby string like "chrome_143" into a BrowserEmulation variant.
+fn parse_emulation(name: &str) -> Result<BrowserEmulation, magnus::Error> {
+    let json_val = serde_json::Value::String(name.to_string());
+    serde_json::from_value::<BrowserEmulation>(json_val)
+        .map_err(|_| generic_error(format!("unknown emulation: '{}'. Use names like 'chrome_143', 'firefox_146', 'safari_18_5', etc.", name)))
+}
+
+// --------------------------------------------------------------------------
 // Ruby Client
 // --------------------------------------------------------------------------
 
@@ -75,6 +90,21 @@ impl Client {
         let mut builder = wreq::Client::builder();
 
         if let Some(opts) = opts {
+            if let Some(val) = hash_get_value(&opts, "emulation")? {
+                let ruby = unsafe { Ruby::get_unchecked() };
+                if val.is_kind_of(ruby.class_false_class()) {
+                    // emulation: false — skip emulation entirely
+                } else if val.is_kind_of(ruby.class_true_class()) {
+                    builder = builder.emulation(DEFAULT_EMULATION);
+                } else {
+                    let name: String = TryConvert::try_convert(val)?;
+                    let emu = parse_emulation(&name)?;
+                    builder = builder.emulation(emu);
+                }
+            } else {
+                builder = builder.emulation(DEFAULT_EMULATION);
+            }
+
             if let Some(ua) = hash_get_string(&opts, "user_agent")? {
                 builder = builder.user_agent(ua);
             }
@@ -150,6 +180,8 @@ impl Client {
             if let Some(v) = hash_get_bool(&opts, "zstd")? {
                 builder = builder.zstd(v);
             }
+        } else {
+            builder = builder.emulation(DEFAULT_EMULATION);
         }
 
         let client = builder.build().map_err(to_magnus_error)?;
@@ -270,6 +302,19 @@ fn apply_request_options(
     if let Some(proxy_url) = hash_get_string(opts, "proxy")? {
         let proxy = wreq::Proxy::all(&proxy_url).map_err(to_magnus_error)?;
         req = req.proxy(proxy);
+    }
+
+    if let Some(val) = hash_get_value(opts, "emulation")? {
+        let ruby = unsafe { Ruby::get_unchecked() };
+        if val.is_kind_of(ruby.class_false_class()) {
+            // emulation: false — no per-request emulation override
+        } else if val.is_kind_of(ruby.class_true_class()) {
+            req = req.emulation(DEFAULT_EMULATION);
+        } else {
+            let name: String = TryConvert::try_convert(val)?;
+            let emu = parse_emulation(&name)?;
+            req = req.emulation(emu);
+        }
     }
 
     Ok(req)

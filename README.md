@@ -45,6 +45,9 @@ resp = Wreq.get("https://httpbin.org/get", query: { foo: "bar", page: "1" })
 # Authentication
 resp = Wreq.get("https://httpbin.org/bearer", bearer: "my-token")
 resp = Wreq.get("https://httpbin.org/basic-auth/user/pass", basic: ["user", "pass"])
+
+# Browser emulation (enabled by default)
+resp = Wreq.get("https://httpbin.org/get", emulation: "chrome_143")
 ```
 
 ## Using a Client
@@ -67,6 +70,7 @@ client = Wreq::Client.new(
   gzip: true,                  # enable gzip decompression
   brotli: true,                # enable brotli decompression
   zstd: true,                  # enable zstd decompression
+  emulation: "chrome_143",     # browser emulation (enabled by default)
   headers: {                   # default headers for all requests
     "Accept" => "application/json"
   }
@@ -106,6 +110,41 @@ Pass an options hash as the second argument to any HTTP method:
 | `bearer` | String | Bearer token |
 | `basic` | Array | `[username, password]` for Basic auth |
 | `proxy` | String | Per-request proxy URL |
+| `emulation` | String/Boolean | Per-request emulation override |
+
+## Browser Emulation
+
+wreq-rb emulates real browser TLS fingerprints, HTTP/2 settings, and headers by default. **Chrome 143 is used when no emulation is specified.**
+
+```ruby
+# Default: Chrome 143 emulation (automatic)
+resp = Wreq.get("https://tls.peet.ws/api/all")
+
+# Explicit browser emulation
+client = Wreq::Client.new(emulation: "firefox_146")
+client = Wreq::Client.new(emulation: "safari_18_5")
+client = Wreq::Client.new(emulation: "edge_142")
+
+# Disable emulation entirely
+client = Wreq::Client.new(emulation: false)
+
+# Emulation + custom user-agent (user_agent overrides emulation's UA)
+client = Wreq::Client.new(emulation: "chrome_143", user_agent: "MyBot/1.0")
+
+# Per-request emulation override
+resp = client.get("https://example.com", emulation: "safari_26_2")
+```
+
+### Supported Browsers
+
+| Browser | Example values |
+|---------|---------------|
+| Chrome | `chrome_100` .. `chrome_143` |
+| Firefox | `firefox_109`, `firefox_146`, `firefox_private_135` |
+| Safari | `safari_15_3` .. `safari_26_2`, `safari_ios_26`, `safari_ipad_18` |
+| Edge | `edge_101` .. `edge_142` |
+| Opera | `opera_116` .. `opera_119` |
+| OkHttp | `okhttp_3_9` .. `okhttp_5` |
 
 ## Response
 

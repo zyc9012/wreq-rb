@@ -1992,6 +1992,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "typed-builder"
+version = "0.23.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31aa81521b70f94402501d848ccc0ecaa8f93c8eb6999eb9747e72287757ffda"
+dependencies = [
+ "typed-builder-macro",
+]
+
+[[package]]
+name = "typed-builder-macro"
+version = "0.23.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "076a02dc54dd46795c2e9c8282ed40bcfb1e22747e955de9389a1de28190fb26"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "typenum"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2505,6 +2525,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "wreq-util"
+version = "3.0.0-rc.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2430952360874ecff465a5541de6c214a12fc232540a9a35192a7be2115e28a0"
+dependencies = [
+ "serde",
+ "typed-builder",
+ "wreq",
+]
+
+[[package]]
 name = "wreq_rb"
 version = "0.1.0"
 dependencies = [
@@ -2514,6 +2545,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "wreq",
+ "wreq-util",
 ]
 
 [[package]]
