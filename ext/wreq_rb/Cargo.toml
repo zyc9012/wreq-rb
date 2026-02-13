@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 magnus = { version = "0.8", features = ["rb-sys"] }
+rb-sys = "0.9"
 wreq = { path = "../../vendor/wreq", features = [
   "cookies",
   "json",

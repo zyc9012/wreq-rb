@@ -1,3 +1,5 @@
+use std::ffi::c_void;
+use std::ptr;
 use std::time::Duration;
 
 use magnus::{
@@ -27,32 +29,58 @@ fn runtime() -> &'static Runtime {
 }
 
 // --------------------------------------------------------------------------
-// Helper: convert wreq response to Ruby Response
+// GVL release helper
 // --------------------------------------------------------------------------
 
-fn collect_response(resp: wreq::Response) -> Result<Response, magnus::Error> {
-    let status = resp.status().as_u16();
-    let url = resp.uri().to_string();
-    let version = format!("{:?}", resp.version());
-    let content_length = resp.content_length();
+/// Run a closure without the Ruby GVL, allowing other Ruby threads to execute.
+///
+/// # Safety
+/// The closure must NOT access any Ruby objects or call any Ruby C API.
+/// Extract all data from Ruby before calling this, convert results after.
+unsafe fn without_gvl<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    struct CallData<F, R> {
+        func: Option<F>,
+        result: Option<R>,
+    }
 
-    let headers: Vec<(String, String)> = resp
-        .headers()
-        .iter()
-        .map(|(k, v)| {
-            (
-                k.as_str().to_string(),
-                v.to_str().unwrap_or("").to_string(),
-            )
-        })
-        .collect();
+    unsafe extern "C" fn call<F, R>(data: *mut c_void) -> *mut c_void
+    where
+        F: FnOnce() -> R,
+    {
+        let data = unsafe { &mut *(data as *mut CallData<F, R>) };
+        let f = data.func.take().unwrap();
+        data.result = Some(f());
+        ptr::null_mut()
+    }
 
-    let body = runtime()
-        .block_on(resp.bytes())
-        .map_err(to_magnus_error)?
-        .to_vec();
+    let mut data = CallData {
+        func: Some(f),
+        result: None,
+    };
 
-    Ok(Response::new(status, headers, body, url, version, content_length))
+    unsafe {
+        rb_sys::rb_thread_call_without_gvl(
+            Some(call::<F, R>),
+            &mut data as *mut CallData<F, R> as *mut c_void,
+            None,
+            ptr::null_mut(),
+        );
+    }
+
+    data.result.unwrap()
+}
+
+/// Collected response data as pure Rust types (no Ruby objects).
+struct ResponseData {
+    status: u16,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+    url: String,
+    version: String,
+    content_length: Option<u64>,
 }
 
 // --------------------------------------------------------------------------
@@ -240,11 +268,29 @@ impl Client {
             req = apply_request_options(req, &opts)?;
         }
 
-        let resp = runtime()
-            .block_on(req.send())
-            .map_err(to_magnus_error)?;
+        // Release the GVL so other Ruby threads can run during I/O.
+        // All Ruby data has been extracted into Rust types above.
+        let result: Result<ResponseData, wreq::Error> = unsafe {
+            without_gvl(|| {
+                let resp = runtime().block_on(req.send())?;
+                let status = resp.status().as_u16();
+                let url = resp.uri().to_string();
+                let version = format!("{:?}", resp.version());
+                let content_length = resp.content_length();
+                let headers: Vec<(String, String)> = resp
+                    .headers()
+                    .iter()
+                    .map(|(k, v)| {
+                        (k.as_str().to_owned(), v.to_str().unwrap_or("").to_owned())
+                    })
+                    .collect();
+                let body = runtime().block_on(resp.bytes())?.to_vec();
+                Ok(ResponseData { status, headers, body, url, version, content_length })
+            })
+        };
 
-        collect_response(resp)
+        let data = result.map_err(to_magnus_error)?;
+        Ok(Response::new(data.status, data.headers, data.body, data.url, data.version, data.content_length))
     }
 }
 

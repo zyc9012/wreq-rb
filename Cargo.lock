@@ -2542,6 +2542,7 @@ dependencies = [
  "bytes",
  "http",
  "magnus",
+ "rb-sys",
  "serde_json",
  "tokio",
  "wreq",
