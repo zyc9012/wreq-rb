@@ -29,12 +29,14 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
+          bundler-cache: true
 
       - uses: oxidize-rb/actions/cross-gem@v1
         id: cross-gem
         with:
           platform: ${{ matrix.platform }}
           ruby-versions: "2.7,3.3,3.4"
+          cache-version: v1
 
       - uses: actions/upload-artifact@v6
         with:

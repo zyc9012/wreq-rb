@@ -27,5 +27,6 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
   spec.extensions    = ["ext/wreq_rb/extconf.rb"]
 
-  spec.add_dependency "rb_sys", "~> 0.9"
+  # 0.9.123 is the last version that uses rake-compiler-dock 1.10.0 (Ruby 2.7 support)
+  spec.add_dependency "rb_sys", "0.9.123"
 end
