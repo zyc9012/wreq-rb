@@ -61,4 +61,34 @@ class ThreadSafetyTest < Minitest::Test
       "Ruby thread only incremented counter #{counter} times during a 2s request " \
       "(expected >1000 if GVL is released)"
   end
+
+  def test_thread_kill_cancels_request
+    # Verify that Thread.kill interrupts a blocked request promptly
+    # rather than waiting for the full network timeout.
+    client = Wreq::Client.new(timeout: 30)
+
+    error = nil
+    t = Thread.new do
+      begin
+        # This endpoint delays 10s, but we'll kill the thread much sooner.
+        client.get("https://httpbin.org/delay/10")
+      rescue => e
+        error = e
+      end
+    end
+
+    # Give the thread time to enter the native blocking call
+    sleep 1
+
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    t.kill
+    t.join
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+
+    # Thread.kill should cause the request to abort quickly (< 2s),
+    # not wait for the full 10s delay.
+    assert elapsed < 3,
+      "Thread.kill took #{elapsed.round(2)}s to interrupt the request " \
+      "(expected < 3s; cancellation may not be working)"
+  end
 end
