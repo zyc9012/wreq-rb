@@ -116,6 +116,22 @@ enum RequestOutcome {
     Interrupted,
 }
 
+/// Execute a request and collect the full response as pure Rust types.
+async fn execute_request(req: wreq::RequestBuilder) -> Result<ResponseData, wreq::Error> {
+    let resp = req.send().await?;
+    let status = resp.status().as_u16();
+    let url = resp.uri().to_string();
+    let version = format!("{:?}", resp.version());
+    let content_length = resp.content_length();
+    let headers: Vec<(String, String)> = resp
+        .headers()
+        .iter()
+        .map(|(k, v)| (k.as_str().to_owned(), v.to_str().unwrap_or("").to_owned()))
+        .collect();
+    let body = resp.bytes().await?.to_vec();
+    Ok(ResponseData { status, headers, body, url, version, content_length })
+}
+
 // --------------------------------------------------------------------------
 // Emulation helpers
 // --------------------------------------------------------------------------
@@ -311,29 +327,10 @@ impl Client {
                     tokio::select! {
                         biased;
                         _ = cancel.cancelled() => RequestOutcome::Interrupted,
-                        res = async {
-                            let resp = match req.send().await {
-                                Ok(r) => r,
-                                Err(e) => return RequestOutcome::Err(e),
-                            };
-                            let status = resp.status().as_u16();
-                            let url = resp.uri().to_string();
-                            let version = format!("{:?}", resp.version());
-                            let content_length = resp.content_length();
-                            let headers: Vec<(String, String)> = resp
-                                .headers()
-                                .iter()
-                                .map(|(k, v)| {
-                                    (k.as_str().to_owned(), v.to_str().unwrap_or("").to_owned())
-                                })
-                                .collect();
-                            match resp.bytes().await {
-                                Ok(b) => RequestOutcome::Ok(ResponseData {
-                                    status, headers, body: b.to_vec(), url, version, content_length,
-                                }),
-                                Err(e) => RequestOutcome::Err(e),
-                            }
-                        } => res,
+                        res = execute_request(req) => match res {
+                            Ok(data) => RequestOutcome::Ok(data),
+                            Err(e) => RequestOutcome::Err(e),
+                        },
                     }
                 })
             })
