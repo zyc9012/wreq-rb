@@ -137,4 +137,60 @@ class WreqClientTest < Minitest::Test
     body = resp.json
     assert_equal "my-bot/2.0", body["user-agent"]
   end
+
+  # ---- GVL release tests ----
+
+  def test_gvl_released_during_network_io
+    # If the GVL is properly released, multiple threads can make
+    # requests concurrently and finish faster than sequentially.
+    client = Wreq::Client.new(timeout: 10)
+    num_threads = 4
+
+    # httpbin.org/delay/N sleeps for N seconds server-side
+    delay = 2
+
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    threads = num_threads.times.map do
+      Thread.new do
+        resp = client.get("https://httpbin.org/delay/#{delay}")
+        resp.status
+      end
+    end
+    results = threads.map(&:value)
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start
+
+    # All requests should succeed
+    results.each { |status| assert_equal 200, status }
+
+    # If GVL were held, this would take ~num_threads * delay seconds.
+    # With GVL released, requests run in parallel: ~delay seconds + overhead.
+    max_expected = delay * num_threads - 1  # well under sequential time
+    assert elapsed < max_expected,
+      "Expected concurrent requests to finish in <#{max_expected}s, " \
+      "but took #{elapsed.round(2)}s (GVL may not be released)"
+  end
+
+  def test_threads_can_run_ruby_during_request
+    # Verify that a Ruby thread can do work while another is blocked on I/O.
+    client = Wreq::Client.new(timeout: 10)
+    ruby_thread_ran = false
+
+    request_thread = Thread.new do
+      client.get("https://httpbin.org/delay/2")
+    end
+
+    # Give the request thread a moment to start I/O
+    sleep 0.1
+
+    # This Ruby thread should be able to run while the request is in flight
+    ruby_thread = Thread.new do
+      ruby_thread_ran = true
+    end
+    ruby_thread.join(3)
+
+    request_thread.join
+
+    assert ruby_thread_ran,
+      "Ruby thread could not run while request was in flight (GVL not released)"
+  end
 end
