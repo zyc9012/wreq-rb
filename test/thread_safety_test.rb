@@ -30,25 +30,35 @@ class ThreadSafetyTest < Minitest::Test
       "but took #{elapsed.round(2)}s (GVL may not be released)"
   end
 
-  def test_threads_can_run_ruby_during_request
-    # Verify that a Ruby thread can do work while another is blocked on I/O.
+  def test_ruby_thread_runs_during_request
+    # Verify that a Ruby thread can do meaningful work while another
+    # thread is blocked on network I/O in native code.
     client = Wreq::Client.new(timeout: 10)
-    ruby_thread_ran = false
+    counter = 0
+    stop = false
 
     request_thread = Thread.new do
       client.get("https://httpbin.org/delay/2")
     end
 
-    sleep 0.1
+    # Let the request thread start and enter the native blocking call
+    sleep 0.3
 
-    ruby_thread = Thread.new do
-      ruby_thread_ran = true
+    counter_thread = Thread.new do
+      until stop
+        counter += 1
+        # Yield to let other threads run; this is pure Ruby, needs GVL
+        Thread.pass
+      end
     end
-    ruby_thread.join(3)
 
+    # Wait for the request to finish
     request_thread.join
+    stop = true
+    counter_thread.join
 
-    assert ruby_thread_ran,
-      "Ruby thread could not run while request was in flight (GVL not released)"
+    assert counter > 1000,
+      "Ruby thread only incremented counter #{counter} times during a 2s request " \
+      "(expected >1000 if GVL is released)"
   end
 end
