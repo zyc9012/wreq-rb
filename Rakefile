@@ -2,6 +2,7 @@
 
 require "bundler/gem_tasks"
 require "rake/extensiontask"
+require "rb_sys"
 require "rb_sys/extensiontask"
 require "minitest/test_task"
 
@@ -10,13 +11,7 @@ GEMSPEC = Gem::Specification.load("wreq.gemspec")
 RbSys::ExtensionTask.new("wreq_rb", GEMSPEC) do |ext|
   ext.lib_dir = "lib/wreq_rb"
   ext.cross_compile = true
-  ext.cross_platform = %w[
-    aarch64-linux
-    x86_64-linux
-    arm64-darwin
-    x86_64-darwin
-    x64-mingw-ucrt
-  ]
+  ext.cross_platform = RbSys::ToolchainInfo.supported_ruby_platforms
 end
 
 Minitest::TestTask.create(:test) do |t|
