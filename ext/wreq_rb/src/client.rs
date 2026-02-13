@@ -1,6 +1,7 @@
 use std::ffi::c_void;
 use std::panic::{self, AssertUnwindSafe};
 use std::ptr;
+use std::any::Any;
 use std::time::Duration;
 
 use magnus::{
@@ -49,7 +50,7 @@ where
         func: Option<F>,
         result: Option<R>,
         token: CancellationToken,
-        panicked: bool,
+        panic_payload: Option<Box<dyn Any + Send>>,
     }
 
     unsafe extern "C" fn call<F, R>(data: *mut c_void) -> *mut c_void
@@ -62,7 +63,7 @@ where
         // catch_unwind prevents a panic from unwinding through C frames (UB).
         match panic::catch_unwind(AssertUnwindSafe(|| f(token))) {
             Ok(val) => ptr::write(&mut (*d).result, Some(val)),
-            Err(_) => (*d).panicked = true,
+            Err(payload) => (*d).panic_payload = Some(payload),
         }
         ptr::null_mut()
     }
@@ -78,7 +79,7 @@ where
         func: Some(f),
         result: None,
         token: CancellationToken::new(),
-        panicked: false,
+        panic_payload: None,
     };
     let data_ptr = &mut data as *mut CallData<F, R> as *mut c_void;
 
@@ -91,8 +92,8 @@ where
         );
     }
 
-    if data.panicked {
-        panic!("closure panicked inside without_gvl");
+    if let Some(payload) = data.panic_payload {
+        panic::resume_unwind(payload);
     }
 
     data.result.unwrap()
