@@ -47,7 +47,7 @@ resp = Wreq.get("https://httpbin.org/bearer", bearer: "my-token")
 resp = Wreq.get("https://httpbin.org/basic-auth/user/pass", basic: ["user", "pass"])
 
 # Browser emulation (enabled by default)
-resp = Wreq.get("https://httpbin.org/get", emulation: "chrome_143")
+resp = Wreq.get("https://tls.peet.ws/api/all", emulation: "chrome_143")
 ```
 
 ## Using a Client
