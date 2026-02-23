@@ -66,6 +66,8 @@ client = Wreq::Client.new(
   proxy_user: "user",          # proxy auth
   proxy_pass: "pass",
   https_only: false,           # restrict to HTTPS
+  verify_host: true,           # verify TLS hostname (default: true)
+  verify_cert: true,           # verify TLS certificate (default: true)
   http2_only: false,           # force HTTP/2
   gzip: true,                  # enable gzip decompression
   brotli: true,                # enable brotli decompression

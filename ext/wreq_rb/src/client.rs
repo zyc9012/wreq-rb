@@ -238,6 +238,14 @@ impl Client {
                 builder = builder.https_only(enabled);
             }
 
+            if let Some(v) = hash_get_bool(&opts, "verify_host")? {
+                builder = builder.verify_hostname(v);
+            }
+
+            if let Some(v) = hash_get_bool(&opts, "verify_cert")? {
+                builder = builder.cert_verification(v);
+            }
+
             if let Some(true) = hash_get_bool(&opts, "http1_only")? {
                 builder = builder.http1_only();
             }
