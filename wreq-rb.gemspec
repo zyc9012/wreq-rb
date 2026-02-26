@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require_relative "lib/wreq-rb/version"
+
 Gem::Specification.new do |spec|
   spec.name          = "wreq-rb"
-  spec.version       = "0.1.0"
+  spec.version       = Wreq::VERSION
   spec.authors       = ["Yicheng Zhou"]
   spec.summary       = "Ruby HTTP client featuring TLS fingerprint emulation, HTTP/2 support, cookie handling, and proxy support."
   spec.description   = "An ergonomic Ruby HTTP client powered by Rust's wreq library, " \
