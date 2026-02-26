@@ -65,12 +65,15 @@ client = Wreq::Client.new(
   proxy: "http://proxy:8080",  # proxy URL (supports http, https, socks5)
   proxy_user: "user",          # proxy auth
   proxy_pass: "pass",
+  no_proxy: true,              # disable all proxies (including env-vars)
   https_only: false,           # restrict to HTTPS
   verify_host: true,           # verify TLS hostname (default: true)
   verify_cert: true,           # verify TLS certificate (default: true)
-  http2_only: false,           # force HTTP/2
+  http1_only: false,           # force HTTP/1.1 only
+  http2_only: false,           # force HTTP/2 only
   gzip: true,                  # enable gzip decompression
   brotli: true,                # enable brotli decompression
+  deflate: true,               # enable deflate decompression
   zstd: true,                  # enable zstd decompression
   emulation: "chrome_143",     # browser emulation (enabled by default)
   headers: {                   # default headers for all requests
