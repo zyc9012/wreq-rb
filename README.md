@@ -7,7 +7,7 @@ Ruby bindings for the [wreq](https://github.com/0x676e67/wreq) Rust HTTP client 
 Add to your Gemfile:
 
 ```ruby
-gem "wreq"
+gem "wreq-rb"
 ```
 
 Then run:
@@ -21,7 +21,7 @@ bundle install
 ## Quick Start
 
 ```ruby
-require "wreq"
+require "wreq-rb"
 
 # Simple GET request
 resp = Wreq.get("https://httpbin.org/get")

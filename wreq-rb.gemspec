@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 Gem::Specification.new do |spec|
-  spec.name          = "wreq"
+  spec.name          = "wreq-rb"
   spec.version       = "0.1.0"
   spec.authors       = ["Yicheng Zhou"]
   spec.summary       = "Ruby HTTP client featuring TLS fingerprint emulation, HTTP/2 support, cookie handling, and proxy support."

@@ -11,7 +11,7 @@ rescue LoadError => e
   require_relative 'wreq_rb/wreq_rb'
 end
 
-require_relative "wreq/version"
+require_relative "wreq-rb/version"
 
 module Wreq
 end

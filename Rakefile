@@ -6,7 +6,7 @@ require "rb_sys"
 require "rb_sys/extensiontask"
 require "minitest/test_task"
 
-GEMSPEC = Gem::Specification.load("wreq.gemspec")
+GEMSPEC = Gem::Specification.load("wreq-rb.gemspec")
 
 RbSys::ExtensionTask.new("wreq_rb", GEMSPEC) do |ext|
   ext.lib_dir = "lib/wreq_rb"
