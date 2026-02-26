@@ -19,4 +19,20 @@ class ClientTest < Minitest::Test
     resp = client.get("https://httpbin.org/redirect/2")
     assert_equal 200, resp.status
   end
+
+  def test_http1_only
+    client = Wreq::Client.new(http1_only: true)
+    resp = client.get("https://httpbin.org/get")
+    assert_equal 200, resp.status
+    assert_equal "HTTP/1.1", resp.version,
+      "Expected HTTP/1.1 when http1_only: true, got #{resp.version}"
+  end
+
+  def test_http2_only
+    client = Wreq::Client.new(http2_only: true)
+    resp = client.get("https://httpbin.org/get")
+    assert_equal 200, resp.status
+    assert_equal "HTTP/2.0", resp.version,
+      "Expected HTTP/2.0 when http2_only: true, got #{resp.version}"
+  end
 end
