@@ -5,12 +5,12 @@ require_relative "lib/wreq-rb/version"
 Gem::Specification.new do |spec|
   spec.name          = "wreq-rb"
   spec.version       = Wreq::VERSION
-  spec.authors       = ["Yicheng Zhou"]
+  spec.authors       = ["Yicheng Zhou", "Illia Zub"]
   spec.summary       = "Ruby HTTP client featuring TLS fingerprint emulation, HTTP/2 support, cookie handling, and proxy support."
   spec.description   = "An ergonomic Ruby HTTP client powered by Rust's wreq library, " \
                         "featuring TLS fingerprint emulation (JA3/JA4), HTTP/2 support, " \
                         "cookie handling, proxy support, and redirect policies."
-  spec.homepage      = "https://github.com/zyc9012/wreq-rb"
+  spec.homepage      = "https://github.com/serpapi/wreq-rb"
   spec.license       = "MIT"
   spec.required_ruby_version = ">= 2.7.0"
 
