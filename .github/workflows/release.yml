@@ -31,6 +31,9 @@ jobs:
           ruby-version: "3.3"
           bundler-cache: true
 
+      - name: Apply patches
+        run: bundle exec rake apply_patches
+
       - uses: oxidize-rb/actions/cross-gem@v1
         id: cross-gem
         with:
