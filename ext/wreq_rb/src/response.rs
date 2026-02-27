@@ -13,6 +13,7 @@ pub struct Response {
     url: String,
     version: String,
     content_length: Option<u64>,
+    transfer_size: Option<u64>,
 }
 
 impl Response {
@@ -23,6 +24,7 @@ impl Response {
         url: String,
         version: String,
         content_length: Option<u64>,
+        transfer_size: Option<u64>,
     ) -> Self {
         Self {
             status,
@@ -31,6 +33,7 @@ impl Response {
             url,
             version,
             content_length,
+            transfer_size,
         }
     }
 
@@ -65,6 +68,10 @@ impl Response {
 
     fn content_length(&self) -> Option<u64> {
         self.content_length
+    }
+
+    fn transfer_size(&self) -> Option<u64> {
+        self.transfer_size
     }
 
     fn is_success(&self) -> bool {
@@ -113,6 +120,7 @@ pub fn init(ruby: &magnus::Ruby, module: &magnus::RModule) -> Result<(), magnus:
     class.define_method("url", method!(Response::url, 0))?;
     class.define_method("version", method!(Response::http_version, 0))?;
     class.define_method("content_length", method!(Response::content_length, 0))?;
+    class.define_method("transfer_size", method!(Response::transfer_size, 0))?;
     class.define_method("success?", method!(Response::is_success, 0))?;
     class.define_method("redirect?", method!(Response::is_redirect, 0))?;
     class.define_method("client_error?", method!(Response::is_client_error, 0))?;

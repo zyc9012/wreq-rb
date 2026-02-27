@@ -1,0 +1,292 @@
+diff --git a/src/client/http.rs b/src/client/http.rs
+index 10be0c83..462c77d0 100644
+--- a/src/client/http.rs
++++ b/src/client/http.rs
+@@ -33,6 +33,7 @@ use self::future::Pending;
+     feature = "deflate",
+ ))]
+ use super::layer::decoder::{AcceptEncoding, DecompressionLayer};
++use super::layer::transfer_size::{CountingBody, TransferSizeLayer, TransferSizeService};
+ #[cfg(feature = "ws")]
+ use super::ws::WebSocketRequestBuilder;
+ use super::{
+@@ -104,7 +105,7 @@ type Decompression<T> = super::layer::decoder::Decompression<T>;
+     feature = "brotli",
+     feature = "deflate"
+ ))]
+-type ResponseBody = TimeoutBody<tower_http::decompression::DecompressionBody<Incoming>>;
++type ResponseBody = TimeoutBody<tower_http::decompression::DecompressionBody<CountingBody<Incoming>>>;
+ 
+ /// Response body type with timeout only (no compression features).
+ #[cfg(not(any(
+@@ -113,23 +114,25 @@ type ResponseBody = TimeoutBody<tower_http::decompression::DecompressionBody<Inc
+     feature = "brotli",
+     feature = "deflate"
+ )))]
+-type ResponseBody = TimeoutBody<Incoming>;
++type ResponseBody = TimeoutBody<CountingBody<Incoming>>;
+ 
+ /// The complete HTTP client service stack with all middleware layers.
+ type ClientService = Timeout<
+     ResponseBodyTimeout<
+         ConfigService<
+             Decompression<
+-                Retry<
+-                    RetryPolicy,
+-                    FollowRedirect<
+-                        CookieService<
+-                            MapErr<
+-                                HttpClient<Connector, Body>,
+-                                fn(client::error::Error) -> BoxError,
++                TransferSizeService<
++                    Retry<
++                        RetryPolicy,
++                        FollowRedirect<
++                            CookieService<
++                                MapErr<
++                                    HttpClient<Connector, Body>,
++                                    fn(client::error::Error) -> BoxError,
++                                >,
+                             >,
++                            FollowRedirectPolicy,
+                         >,
+-                        FollowRedirectPolicy,
+                     >,
+                 >,
+             >,
+@@ -582,6 +585,10 @@ impl ClientBuilder {
+                 })
+                 .service(service);
+ 
++            let service = ServiceBuilder::new()
++                .layer(TransferSizeLayer::new())
++                .service(service);
++
+             #[cfg(any(
+                 feature = "gzip",
+                 feature = "zstd",
+diff --git a/src/client/layer.rs b/src/client/layer.rs
+index 05bb533f..cb0b0866 100644
+--- a/src/client/layer.rs
++++ b/src/client/layer.rs
+@@ -13,3 +13,4 @@ pub mod decoder;
+ pub mod redirect;
+ pub mod retry;
+ pub mod timeout;
++pub mod transfer_size;
+diff --git a/src/client/layer/transfer_size.rs b/src/client/layer/transfer_size.rs
+new file mode 100644
+index 00000000..7e8a4390
+--- /dev/null
++++ b/src/client/layer/transfer_size.rs
+@@ -0,0 +1,176 @@
++//! Middleware that records the network transfer size (pre-decompression bytes).
++//!
++//! This layer sits **below** the decompression layer so that it sees the raw
++//! compressed bytes flowing through the body. It wraps the response body in
++//! [`CountingBody`] which counts bytes as they flow through `poll_frame()`.
++//! The running total is accessible via a shared [`TransferSizeHandle`] stored
++//! in the response extensions.
++
++use std::{
++    pin::Pin,
++    sync::{
++        atomic::{AtomicU64, Ordering},
++        Arc,
++    },
++    task::{Context, Poll},
++};
++
++use bytes::Bytes;
++use http::{Request, Response};
++use http_body::{Body, Frame};
++use tower::{Layer, Service};
++
++/// A shared handle to the running byte count of the response body on the wire.
++///
++/// Call [`TransferSizeHandle::get()`] **after** the body has been fully
++/// consumed to obtain the total transferred bytes.
++#[derive(Debug, Clone)]
++pub struct TransferSizeHandle(Arc<AtomicU64>);
++
++impl TransferSizeHandle {
++    /// Returns the number of bytes that have flowed through the body so far.
++    #[inline]
++    pub fn get(&self) -> u64 {
++        self.0.load(Ordering::Relaxed)
++    }
++}
++
++// ===== CountingBody =====
++
++pin_project_lite::pin_project! {
++    /// A body wrapper that counts raw bytes flowing through `poll_frame()`.
++    pub struct CountingBody<B> {
++        #[pin]
++        inner: B,
++        counter: Arc<AtomicU64>,
++    }
++}
++
++impl<B> Body for CountingBody<B>
++where
++    B: Body<Data = Bytes>,
++    B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
++{
++    type Data = Bytes;
++    type Error = B::Error;
++
++    fn poll_frame(
++        self: Pin<&mut Self>,
++        cx: &mut Context<'_>,
++    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
++        let this = self.project();
++        match this.inner.poll_frame(cx) {
++            Poll::Ready(Some(Ok(frame))) => {
++                if let Some(data) = frame.data_ref() {
++                    this.counter
++                        .fetch_add(data.len() as u64, Ordering::Relaxed);
++                }
++                Poll::Ready(Some(Ok(frame)))
++            }
++            other => other,
++        }
++    }
++
++    #[inline]
++    fn is_end_stream(&self) -> bool {
++        self.inner.is_end_stream()
++    }
++
++    #[inline]
++    fn size_hint(&self) -> http_body::SizeHint {
++        self.inner.size_hint()
++    }
++}
++
++// ===== TransferSizeLayer / TransferSizeService =====
++
++/// A [`Layer`] that wraps responses with transfer-size tracking.
++#[derive(Debug, Clone, Copy, Default)]
++pub struct TransferSizeLayer;
++
++impl TransferSizeLayer {
++    /// Create a new [`TransferSizeLayer`].
++    #[inline]
++    pub const fn new() -> Self {
++        Self
++    }
++}
++
++impl<S> Layer<S> for TransferSizeLayer {
++    type Service = TransferSizeService<S>;
++
++    #[inline]
++    fn layer(&self, inner: S) -> Self::Service {
++        TransferSizeService { inner }
++    }
++}
++
++/// The [`Service`] created by [`TransferSizeLayer`].
++#[derive(Debug, Clone)]
++pub struct TransferSizeService<S> {
++    inner: S,
++}
++
++impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for TransferSizeService<S>
++where
++    S: Service<Request<ReqBody>, Response = Response<ResBody>>,
++    ResBody: Body<Data = Bytes>,
++    ResBody::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
++{
++    type Response = Response<CountingBody<ResBody>>;
++    type Error = S::Error;
++    type Future = TransferSizeFuture<S::Future>;
++
++    #[inline]
++    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
++        self.inner.poll_ready(cx)
++    }
++
++    #[inline]
++    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
++        TransferSizeFuture {
++            inner: self.inner.call(req),
++        }
++    }
++}
++
++// ===== TransferSizeFuture =====
++
++pin_project_lite::pin_project! {
++    /// Future returned by [`TransferSizeService`].
++    pub struct TransferSizeFuture<F> {
++        #[pin]
++        inner: F,
++    }
++}
++
++impl<F, ResBody, E> std::future::Future for TransferSizeFuture<F>
++where
++    F: std::future::Future<Output = Result<Response<ResBody>, E>>,
++    ResBody: Body<Data = Bytes>,
++    ResBody::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
++{
++    type Output = Result<Response<CountingBody<ResBody>>, E>;
++
++    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
++        let this = self.project();
++        match this.inner.poll(cx) {
++            Poll::Ready(Ok(response)) => {
++                let counter = Arc::new(AtomicU64::new(0));
++                let handle = TransferSizeHandle(counter.clone());
++
++                let (mut parts, body) = response.into_parts();
++                parts.extensions.insert(handle);
++
++                let counting_body = CountingBody {
++                    inner: body,
++                    counter,
++                };
++
++                Poll::Ready(Ok(Response::from_parts(parts, counting_body)))
++            }
++            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
++            Poll::Pending => Poll::Pending,
++        }
++    }
++}
+diff --git a/src/client/response.rs b/src/client/response.rs
+index d98859b9..16ed35c3 100644
+--- a/src/client/response.rs
++++ b/src/client/response.rs
+@@ -20,6 +20,7 @@ use serde::de::DeserializeOwned;
+ use super::{
+     conn::HttpInfo,
+     core::{ext::ReasonPhrase, upgrade},
++    layer::transfer_size::TransferSizeHandle,
+ };
+ #[cfg(feature = "cookies")]
+ use crate::cookie;
+@@ -91,6 +92,21 @@ impl Response {
+         HttpBody::size_hint(self.res.body()).exact()
+     }
+ 
++    /// Get a handle to the transfer size counter for this response.
++    ///
++    /// The handle tracks the number of raw (pre-decompression) bytes received
++    /// from the network as the body is consumed. Call
++    /// [`TransferSizeHandle::get()`] **after** the body has been fully read
++    /// (e.g. after [`bytes()`](Self::bytes) or [`text()`](Self::text)) to
++    /// obtain the total network transfer size.
++    ///
++    /// Returns `None` only if the response was constructed outside the normal
++    /// client pipeline (e.g. via `From<http::Response>`).
++    #[inline]
++    pub fn transfer_size_handle(&self) -> Option<&TransferSizeHandle> {
++        self.res.extensions().get::<TransferSizeHandle>()
++    }
++
+     /// Retrieve the cookies contained in the [`Response`].
+     ///
+     /// Note that invalid 'Set-Cookie' headers will be ignored.

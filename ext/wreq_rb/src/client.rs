@@ -107,6 +107,7 @@ struct ResponseData {
     url: String,
     version: String,
     content_length: Option<u64>,
+    transfer_size: Option<u64>,
 }
 
 /// Outcome of the network call performed outside the GVL.
@@ -128,8 +129,10 @@ async fn execute_request(req: wreq::RequestBuilder) -> Result<ResponseData, wreq
         .iter()
         .map(|(k, v)| (k.as_str().to_owned(), v.to_str().unwrap_or("").to_owned()))
         .collect();
+    let transfer_size_handle = resp.transfer_size_handle().cloned();
     let body = resp.bytes().await?.to_vec();
-    Ok(ResponseData { status, headers, body, url, version, content_length })
+    let transfer_size = transfer_size_handle.map(|h| h.get());
+    Ok(ResponseData { status, headers, body, url, version, content_length, transfer_size })
 }
 
 // --------------------------------------------------------------------------
@@ -346,7 +349,7 @@ impl Client {
             RequestOutcome::Err(e) => return Err(to_magnus_error(e)),
             RequestOutcome::Interrupted => return Err(generic_error("request interrupted")),
         };
-        Ok(Response::new(data.status, data.headers, data.body, data.url, data.version, data.content_length))
+        Ok(Response::new(data.status, data.headers, data.body, data.url, data.version, data.content_length, data.transfer_size))
     }
 }
 
