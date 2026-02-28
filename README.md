@@ -165,6 +165,7 @@ The `Wreq::Response` object provides:
 | `url` | String | Final URL (after redirects) |
 | `version` | String | HTTP version |
 | `content_length` | Integer/nil | Content length if known |
+| `transfer_size` | Integer/nil | Bytes transferred over the wire |
 | `success?` | Boolean | Status 2xx? |
 | `redirect?` | Boolean | Status 3xx? |
 | `client_error?` | Boolean | Status 4xx? |
