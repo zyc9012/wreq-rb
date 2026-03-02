@@ -76,6 +76,7 @@ client = Wreq::Client.new(
   deflate: true,               # enable deflate decompression
   zstd: true,                  # enable zstd decompression
   emulation: "chrome_143",     # browser emulation (enabled by default)
+  emulation_os: "windows",     # OS emulation: windows, macos (default), linux, android, ios
   headers: {                   # default headers for all requests
     "Accept" => "application/json"
   }
@@ -116,6 +117,7 @@ Pass an options hash as the second argument to any HTTP method:
 | `basic` | Array | `[username, password]` for Basic auth |
 | `proxy` | String | Per-request proxy URL |
 | `emulation` | String/Boolean | Per-request emulation override |
+| `emulation_os` | String | OS emulation: `windows`, `macos`, `linux`, `android`, `ios` |
 
 ## Browser Emulation
 
@@ -131,6 +133,10 @@ client = Wreq::Client.new(emulation: "edge_142")
 
 # Disable emulation entirely
 client = Wreq::Client.new(emulation: false)
+
+# Emulate a specific OS (default is macOS)
+client = Wreq::Client.new(emulation: "chrome_145", emulation_os: "windows")
+client = Wreq::Client.new(emulation: "chrome_145", emulation_os: "linux")
 
 # Emulation + custom user-agent (user_agent overrides emulation's UA)
 client = Wreq::Client.new(emulation: "chrome_143", user_agent: "MyBot/1.0")

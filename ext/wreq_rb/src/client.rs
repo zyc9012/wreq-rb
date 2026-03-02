@@ -11,7 +11,7 @@ use magnus::{
 use tokio::runtime::Runtime;
 use tokio_util::sync::CancellationToken;
 use wreq::header::{HeaderMap, HeaderName, HeaderValue};
-use wreq_util::Emulation as BrowserEmulation;
+use wreq_util::{Emulation as BrowserEmulation, EmulationOS, EmulationOption};
 
 use crate::error::{generic_error, to_magnus_error};
 use crate::response::Response;
@@ -149,6 +149,28 @@ fn parse_emulation(name: &str) -> Result<BrowserEmulation, magnus::Error> {
         .map_err(|_| generic_error(format!("unknown emulation: '{}'. Use names like 'chrome_145', 'firefox_147', 'safari_18.5', etc.", name)))
 }
 
+/// Parse a Ruby string like "windows" into an EmulationOS variant.
+fn parse_emulation_os(name: &str) -> Result<EmulationOS, magnus::Error> {
+    let json_val = serde_json::Value::String(name.to_string());
+    serde_json::from_value::<EmulationOS>(json_val)
+        .map_err(|_| generic_error("unknown emulation_os. Use: 'windows', 'macos', 'linux', 'android', 'ios'"))
+}
+
+/// Build an EmulationOption from an Emulation and an optional OS from the opts hash.
+fn build_emulation_option(
+    emu: BrowserEmulation,
+    opts: &RHash,
+) -> Result<EmulationOption, magnus::Error> {
+    let os = match hash_get_string(opts, "emulation_os")? {
+        Some(os_name) => parse_emulation_os(&os_name)?,
+        None => EmulationOS::default(),
+    };
+    Ok(EmulationOption::builder()
+        .emulation(emu)
+        .emulation_os(os)
+        .build())
+}
+
 // --------------------------------------------------------------------------
 // Ruby Client
 // --------------------------------------------------------------------------
@@ -175,14 +197,17 @@ impl Client {
                 if val.is_kind_of(ruby.class_false_class()) {
                     // emulation: false — skip emulation entirely
                 } else if val.is_kind_of(ruby.class_true_class()) {
-                    builder = builder.emulation(DEFAULT_EMULATION);
+                    let opt = build_emulation_option(DEFAULT_EMULATION, &opts)?;
+                    builder = builder.emulation(opt);
                 } else {
                     let name: String = TryConvert::try_convert(val)?;
                     let emu = parse_emulation(&name)?;
-                    builder = builder.emulation(emu);
+                    let opt = build_emulation_option(emu, &opts)?;
+                    builder = builder.emulation(opt);
                 }
             } else {
-                builder = builder.emulation(DEFAULT_EMULATION);
+                let opt = build_emulation_option(DEFAULT_EMULATION, &opts)?;
+                builder = builder.emulation(opt);
             }
 
             if let Some(ua) = hash_get_string(&opts, "user_agent")? {
@@ -416,11 +441,13 @@ fn apply_request_options(
         if val.is_kind_of(ruby.class_false_class()) {
             // emulation: false — no per-request emulation override
         } else if val.is_kind_of(ruby.class_true_class()) {
-            req = req.emulation(DEFAULT_EMULATION);
+            let opt = build_emulation_option(DEFAULT_EMULATION, opts)?;
+            req = req.emulation(opt);
         } else {
             let name: String = TryConvert::try_convert(val)?;
             let emu = parse_emulation(&name)?;
-            req = req.emulation(emu);
+            let opt = build_emulation_option(emu, opts)?;
+            req = req.emulation(opt);
         }
     }
 

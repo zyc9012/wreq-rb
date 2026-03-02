@@ -29,4 +29,26 @@ class EmulationTest < Minitest::Test
     body = resp.json
     assert_equal "my-bot/2.0", body["user-agent"]
   end
+
+  def test_emulation_os_windows
+    client = Wreq::Client.new(emulation: "chrome_145", emulation_os: "windows")
+    resp = client.get("https://httpbin.org/headers")
+    body = resp.json
+    headers = body["headers"]
+    assert_match(/Windows/, headers["Sec-Ch-Ua-Platform"])
+  end
+
+  def test_emulation_os_macos_default
+    client = Wreq::Client.new(emulation: "chrome_145")
+    resp = client.get("https://httpbin.org/headers")
+    body = resp.json
+    headers = body["headers"]
+    assert_match(/macOS/, headers["Sec-Ch-Ua-Platform"])
+  end
+
+  def test_emulation_os_invalid
+    assert_raises(Wreq::Error) do
+      Wreq::Client.new(emulation: "chrome_145", emulation_os: "beos")
+    end
+  end
 end
