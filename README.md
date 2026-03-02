@@ -119,10 +119,9 @@ Pass an options hash as the second argument to any HTTP method:
 
 ## Browser Emulation
 
-wreq-rb emulates real browser TLS fingerprints, HTTP/2 settings, and headers by default. **Chrome 143 is used when no emulation is specified.**
+wreq-rb emulates real browser TLS fingerprints, HTTP/2 settings, and headers by default. **The lastest supported Chrome is used when no emulation is specified.**
 
 ```ruby
-# Default: Chrome 143 emulation (automatic)
 resp = Wreq.get("https://tls.peet.ws/api/all")
 
 # Explicit browser emulation
@@ -144,10 +143,10 @@ resp = client.get("https://example.com", emulation: "safari_26_2")
 
 | Browser | Example values |
 |---------|---------------|
-| Chrome | `chrome_100` .. `chrome_143` |
-| Firefox | `firefox_109`, `firefox_146`, `firefox_private_135` |
+| Chrome | `chrome_100` .. `chrome_145` |
+| Firefox | `firefox_109` .. `firefox_147`, `firefox_private_135` |
 | Safari | `safari_15.3` .. `safari_26.2`, `safari_ios_26`, `safari_ipad_18` |
-| Edge | `edge_101` .. `edge_142` |
+| Edge | `edge_101` .. `edge_145` |
 | Opera | `opera_116` .. `opera_119` |
 | OkHttp | `okhttp_3_9` .. `okhttp_5` |
 

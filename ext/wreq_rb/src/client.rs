@@ -140,13 +140,13 @@ async fn execute_request(req: wreq::RequestBuilder) -> Result<ResponseData, wreq
 // --------------------------------------------------------------------------
 
 /// The default emulation to apply when none is specified.
-const DEFAULT_EMULATION: BrowserEmulation = BrowserEmulation::Chrome143;
+const DEFAULT_EMULATION: BrowserEmulation = BrowserEmulation::Chrome145;
 
 /// Parse a Ruby string like "chrome_143" into a BrowserEmulation variant.
 fn parse_emulation(name: &str) -> Result<BrowserEmulation, magnus::Error> {
     let json_val = serde_json::Value::String(name.to_string());
     serde_json::from_value::<BrowserEmulation>(json_val)
-        .map_err(|_| generic_error(format!("unknown emulation: '{}'. Use names like 'chrome_143', 'firefox_146', 'safari_18.5', etc.", name)))
+        .map_err(|_| generic_error(format!("unknown emulation: '{}'. Use names like 'chrome_145', 'firefox_147', 'safari_18.5', etc.", name)))
 }
 
 // --------------------------------------------------------------------------
