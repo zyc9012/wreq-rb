@@ -101,6 +101,10 @@ parser = OptionParser.new do |o|
 
   o.on("-x", "--proxy URL", "Proxy URL (e.g. http://host:port)") { |p| cfg[:proxy] = p }
 
+  o.on("--local-address IP", "Bind outgoing connections to this source IP address") do |ip|
+    cfg[:local_address] = ip
+  end
+
   o.on("--timeout SECS", Float, "Total timeout in seconds") { |t| cfg[:timeout] = t }
   o.on("--connect-timeout SECS", Float, "Connection timeout in seconds") { |t| cfg[:connect_timeout] = t }
 
@@ -154,7 +158,7 @@ end
 cfg[:method] ||= "GET"
 
 # Build Wreq::Client options (connection/emulation settings only)
-CLIENT_KEYS = %i[emulation emulation_os user_agent proxy timeout connect_timeout
+CLIENT_KEYS = %i[emulation emulation_os user_agent proxy local_address timeout connect_timeout
                  http1_only http2_only cookie_store https_only].freeze
 client_opts = cfg.slice(*CLIENT_KEYS).reject { |_, v| v.nil? }
 client_opts[:redirect]    = cfg[:redirect]
