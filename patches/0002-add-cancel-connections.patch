@@ -65,7 +65,7 @@ index 462c77d0..6231e700 100644
      }
  
 diff --git a/src/client/http/client.rs b/src/client/http/client.rs
-index a29c52dd..c4e9ab57 100644
+index a29c52dd..7f6ce68f 100644
 --- a/src/client/http/client.rs
 +++ b/src/client/http/client.rs
 @@ -10,7 +10,7 @@ use std::{
@@ -95,7 +95,7 @@ index a29c52dd..c4e9ab57 100644
  
          let h1_builder = self.h1_builder.clone();
          let h2_builder = self.h2_builder.clone();
-@@ -513,10 +514,11 @@ where
+@@ -513,10 +514,17 @@ where
                                      trace!(
                                          "http2 handshake complete, spawning background dispatcher task"
                                      );
@@ -107,11 +107,17 @@ index a29c52dd..c4e9ab57 100644
 +                                        .map_err(|_e| debug!("client connection error: {}", _e))
 +                                        .map(|_| ());
 +                                    let abort_handle = tokio::spawn(h2_conn_future).abort_handle();
-+                                    conn_abort_handles.lock().unwrap_or_else(|e| e.into_inner()).push(abort_handle);
++                                    {
++                                        let mut handles = conn_abort_handles.lock().unwrap_or_else(|e| e.into_inner());
++                                        if handles.len() >= 64 {
++                                            handles.retain(|h| !h.is_finished());
++                                        }
++                                        handles.push(abort_handle);
++                                    }
  
                                      // Wait for 'conn' to ready up before we
                                      // declare this tx as usable
-@@ -544,8 +546,7 @@ where
+@@ -544,8 +552,7 @@ where
                                      // Spawn the connection task in the background using the executor.
                                      // The task manages the HTTP/1.1 connection, including upgrades (e.g., WebSocket).
                                      // Errors are sent via err_tx to ensure they can be checked if the sender (tx) fails.
@@ -121,7 +127,7 @@ index a29c52dd..c4e9ab57 100644
                                                  .map_err(|e| {
                                                  // Log the connection error at debug level for diagnostic purposes.
                                                  debug!("client connection error: {:?}", e);
-@@ -555,8 +556,9 @@ where
+@@ -555,8 +562,15 @@ where
                                                  // (e.g., if the receiver is dropped, which is handled later).
                                                  let _ = err_tx.send(e);
                                              })
@@ -129,11 +135,17 @@ index a29c52dd..c4e9ab57 100644
 -                                    );
 +                                            .map(|_| ());
 +                                    let abort_handle = tokio::spawn(h1_conn_future).abort_handle();
-+                                    conn_abort_handles.lock().unwrap_or_else(|e| e.into_inner()).push(abort_handle);
++                                    {
++                                        let mut handles = conn_abort_handles.lock().unwrap_or_else(|e| e.into_inner());
++                                        if handles.len() >= 64 {
++                                            handles.retain(|h| !h.is_finished());
++                                        }
++                                        handles.push(abort_handle);
++                                    }
  
                                      // Log that the client is waiting for the connection to be ready.
                                      // Readiness indicates the sender (tx) can accept a request without blocking. More actions
-@@ -682,10 +684,25 @@ impl<C: Clone, B> Clone for HttpClient<C, B> {
+@@ -682,10 +696,25 @@ impl<C: Clone, B> Clone for HttpClient<C, B> {
              h2_builder: self.h2_builder.clone(),
              connector: self.connector.clone(),
              pool: self.pool.clone(),
@@ -159,7 +171,7 @@ index a29c52dd..c4e9ab57 100644
  /// A pooled HTTP connection that can send requests
  struct PoolClient<B> {
      conn_info: Connected,
-@@ -998,6 +1015,7 @@ impl Builder {
+@@ -998,6 +1027,7 @@ impl Builder {
              h2_builder: self.h2_builder,
              connector,
              pool: pool::Pool::new(self.pool_config, exec, timer),
