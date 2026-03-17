@@ -114,6 +114,19 @@ All methods are available on both `Wreq` (module-level) and `Wreq::Client` (inst
 | `head(url, **opts)` | HEAD request |
 | `options(url, **opts)` | OPTIONS request |
 
+### Cancelling Requests
+
+Call `cancel` on a client to abort all in-flight requests and close their underlying connections immediately:
+
+```ruby
+client = Wreq::Client.new
+
+# From another thread:
+t = Thread.new { client.get("https://slow.example.com/big-download") }
+sleep 1
+client.cancel  # all in-flight requests return with "request interrupted" error
+```
+
 ### Per-Request Options
 
 Pass an options hash as the second argument to any HTTP method:
