@@ -86,11 +86,37 @@ class ClientTest < Minitest::Test
       "got positions #{positions.inspect} in: #{received.inspect}"
   end
 
+  def test_header_order_takes_precedence_over_request_emulation
+    order = ["host", "accept", "user-agent"]
+    custom_user_agent = "wreq-rb-request-test/0.1"
+    client = Wreq::Client.new(
+      emulation: false,
+      http1_only: true,
+      no_proxy: true,
+      header_order: order
+    )
+    received = capture_wire_headers(include_values: true) do |url|
+      client.get(url,
+        emulation: "chrome_145",
+        headers: { "User-Agent" => custom_user_agent })
+    end
+    header_names = received.map { |line| line.split(":", 2).first.downcase }
+
+    positions = order.map { |header| header_names.index(header) }.compact
+    assert_equal order.size, positions.size,
+      "Not all target headers found in: #{received.inspect}"
+    assert_equal positions.sort, positions,
+      "Expected client's header_order #{order.inspect} to take precedence " \
+      "over request emulation; got positions #{positions.inspect} in: #{received.inspect}"
+    user_agent = received.find { |line| line.downcase.start_with?("user-agent:") }
+    assert_equal custom_user_agent, user_agent&.split(":", 2)&.last&.strip
+  end
+
   private
 
   # Spins up a local TCP server, yields the port formatted into a URL, captures
-  # the header names from the raw HTTP/1.1 request, then tears down the server.
-  def capture_wire_headers
+  # the raw HTTP/1.1 request headers, then tears down the server.
+  def capture_wire_headers(include_values: false)
     require "socket"
     server = TCPServer.new("127.0.0.1", 0)
     port = server.addr[1]
@@ -101,7 +127,11 @@ class ClientTest < Minitest::Test
       loop do
         line = conn.gets&.chomp
         break if line.nil? || line.empty?
-        received << line.split(":", 2).first.downcase
+        received << if include_values
+          line
+        else
+          line.split(":", 2).first.downcase
+        end
       end
       conn.write "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
       conn.close
